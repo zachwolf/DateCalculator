@@ -37,7 +37,7 @@
 
 (function() {
 
-  (function(jQuery, window) {
+  (function($, window) {
     var Countdown, Timer, console, name;
     console = window.console;
     name = "countdown";
@@ -73,112 +73,165 @@
     Countdown = (function() {
 
       function Countdown(element, settings) {
-        var current, days, hours, minutes, monthLength, monthSetter, months, seconds, units,
+        var _tick,
           _this = this;
         this.element = element;
+        _tick = function() {
+          _this.count(settings);
+          return _this.element.trigger("updateTime", _this.remaining);
+        };
+        this.timer = new Timer(function() {
+          return _tick();
+        });
+        _tick();
+        this.timer.start();
+      }
+
+      Countdown.prototype.count = function(settings) {
+        var monthSetter, seconds, unit, units, value, yearSetter, _current, _i, _len, _month, _monthLength, _months, _ref, _yearLength, _years,
+          _this = this;
         this.startdate = new Date();
         this.enddate = settings.enddate;
         this.remaining = {};
         /*
                * To account for leap years, February is set as a function that
-               * will take into account if the next February from the current date
+               * will take check if the next February from the current date
                * has a bonus day.
         */
 
         units = {
-          seconds: 60,
+          seconds: 1,
           minutes: 60,
-          hours: 24,
-          days: [
-            31, (function() {
-              var d;
-              d = new Date(_this.startdate.getFullYear() + (_this.startdate.getMonth() >= 2 ? 1 : 0), 2, 0);
-              return d.getDate();
-            })(), 31, 30, 31, 30, 31, 31, 30, 31, 30, 31
-          ],
-          weeks: 7,
-          months: 12,
-          years: 365
+          hours: 60 * 60,
+          days: 24 * 60 * 60,
+          weeks: 7 * 24 * 60 * 60,
+          months: (function() {
+            var _i, _len, _ref, _results,
+              _this = this;
+            _ref = [
+              31, (function() {
+                var d;
+                d = new Date(_this.startdate.getFullYear() + (_this.startdate.getMonth() >= 2 ? 1 : 0), 2, 0);
+                return d.getDate();
+              })(), 31, 30, 31, 30, 31, 31, 30, 31, 30, 31
+            ];
+            _results = [];
+            for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+              value = _ref[_i];
+              _results.push(value * 24 * 60 * 60);
+            }
+            return _results;
+          }).call(this),
+          years: 365 * 24 * 60 * 60
         };
         /*
-              # console.log cleanArray settings.values, units
-              
-              for unit of units
-                value = units[unit]
-                if !!value and $.inArray(unit, settings.values) isnt -1
-                  console.log unit, value
-        */
-
-        /*
-               * difference between two dates in seconds
+               * Set the difference between two dates in seconds.
+               *
+               * This value will be continually subtracted from.
+               * Using this method, we can take the difference in days
+               * from month to month as well as leap years.
         */
 
         seconds = Math.floor((this.enddate - this.startdate) / 1000);
         /*
-               * Set the remaining seconds by checking how many
-               * seconds remain with the removal of minutes.
-               * Then find the remaining minutes by dividing by 60 seconds,
-               * and rounding down to a whole number.
+               * Create a blank ojbect that will hold all of our return values
+               *
+               * Loop through the values, checking that an equivilant value
+               * exists in the 'units' object and insert them into the
+               * 'this.remaining'.
         */
 
-        this.remaining.seconds = seconds % units.seconds;
-        minutes = Math.floor(seconds / units.seconds);
-        /*
-               * Repeat for minutes.
-        */
-
-        this.remaining.minutes = minutes % units.minutes;
-        hours = Math.floor(minutes / units.minutes);
-        /*
-               * Repeat for hours.
-        */
-
-        this.remaining.hours = hours % units.hours;
-        /*
-               * Find total number of days.
-               * We will use this number to extract months and years.
-        */
-
-        days = Math.floor(hours / units.hours);
-        /*
-               * Remove the number of full years
-        */
-
-        this.remaining.years = Math.floor(days / units.years);
-        /*
-               * Reassign days with only the remainding after removing years.
-        */
-
-        days = days % units.years;
-        /*
-               * Set the starting positions for the countdown.
-        */
-
-        months = 0;
-        current = this.startdate.getMonth();
-        monthLength = units.days[current];
-        /*
-               * Create an IIFE that will call itsself until it has less days
-               * remaining than days in the month it's checking for.
-        */
-
-        monthSetter = function() {
-          if (days >= monthLength) {
-            days = days - monthLength;
-            months = months + 1;
-            current = current + 1;
-            monthLength = units.days[current];
-            return monthSetter();
-          } else {
-            _this.remaining.months = months;
-            return _this.remaining.days = days;
+        this.remaining = {};
+        for (unit in units) {
+          value = units[unit];
+          if (!!value && $.inArray(unit, settings.values) !== -1) {
+            this.remaining[unit] = true;
           }
-        };
-        monthSetter();
-        this.timer = new Timer(function() {
-          return _this.element.trigger("updateTime", _this.remaining);
-        });
-      }
+        }
+        /*
+               * Loop through the years between now and then.
+               * Looping rather than just checking static years allows
+               * for leap years to be accounted for and not mess up the
+               * count of days between dates.
+        */
+
+        if (this.remaining.years) {
+          _years = 0;
+          _month = this.startdate.getMonth();
+          _current = this.startdate.getFullYear() + (_month > 1 ? +1 : 0);
+          _yearLength = units.years + (new Date(_current, 2, 0).getDate() > 28 ? units.days : 0);
+          /*
+                   * Create an IIFE that will call itsself until it has less days
+                   * remaining than days in the year it's checking for.
+          */
+
+          yearSetter = function() {
+            if (seconds >= _yearLength) {
+              seconds = seconds - _yearLength;
+              _years = _years + 1;
+              _current = _current + 1;
+              _yearLength = units.years + (new Date(_current, 2, 0).getDate() > 28 ? units.days : 0);
+              return yearSetter();
+            } else {
+              return _this.remaining.years = _years;
+            }
+          };
+          yearSetter();
+        }
+        /*
+               * Loop through the months between now and then.
+               * Looping in this manner allows checking for different
+               * length months without removing or not removing the
+               * right amout of time from our count.
+        */
+
+        if (this.remaining.months) {
+          _months = 0;
+          _current = this.startdate.getMonth();
+          _monthLength = units.months[_current];
+          /*
+                   * Create an IIFE that will call itsself until it has less days
+                   * remaining than days in the month it's checking for.
+          */
+
+          monthSetter = function() {
+            if (seconds >= _monthLength) {
+              seconds = seconds - _monthLength;
+              _months = _months + 1;
+              _current = _current + 1;
+              if (_current === 12) {
+                _current = 0;
+              }
+              _monthLength = units.months[_current];
+              return monthSetter();
+            } else {
+              return _this.remaining.months = _months;
+            }
+          };
+          monthSetter();
+        }
+        /*
+               * Since the last units of time (minutes, hours, days, weeks)
+               * don't change their length, we can loop through these
+               * rather than code another if block for each.
+        */
+
+        _ref = ["weeks", "days", "hours", "minutes"];
+        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+          unit = _ref[_i];
+          if (this.remaining[unit]) {
+            this.remaining[unit] = Math.floor(seconds / units[unit]);
+            seconds = seconds % units[unit];
+          }
+        }
+        /*
+               * Finally, set the seconds remaining.
+        */
+
+        if (this.remaining.seconds) {
+          return this.remaining.seconds = seconds;
+        }
+      };
 
       return Countdown;
 
@@ -209,12 +262,18 @@
     */
 
     $.fn[name].defaults = {
-      enddate: new Date("11:59 PM Dec 31 2012 CST"),
-      values: ["years", "months", "weeks", "days", "seconds", "hours"]
+      enddate: new Date("12:59 AM Dec 31 2012 CST"),
+      values: ["days", "minutes", "seconds", "hours"]
     };
-    return $("#countdown")[name]().on("updateTime", function(e, params) {
-      return console.log("updateTime", params);
-    });
-  })($, window);
+    return $("#countdown").on("updateTime", function(e, params) {
+      var k, v, _results;
+      _results = [];
+      for (k in params) {
+        v = params[k];
+        _results.push(console.log(k, v));
+      }
+      return _results;
+    })[name]();
+  })(jQuery, window);
 
 }).call(this);

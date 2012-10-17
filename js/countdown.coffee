@@ -32,7 +32,7 @@
  *
 ###
 
-do (jQuery = $, window = window) ->
+do ($ = jQuery, window = window) ->
 
   console     = window.console
   name        = "countdown"
@@ -55,117 +55,137 @@ do (jQuery = $, window = window) ->
 
   class Countdown
     constructor : (@element, settings) ->
+
+      _tick = =>
+        @count settings
+        @element.trigger "updateTime", @remaining
+
+      @timer = new Timer =>
+        _tick()
+
+      _tick()
+      @timer.start()
+
+    count       : (settings) ->
       @startdate  = new Date()
       @enddate    = settings.enddate
       @remaining  = {}
 
       ###
        * To account for leap years, February is set as a function that
-       * will take into account if the next February from the current date
+       * will take check if the next February from the current date
        * has a bonus day. ###
 
       units       =
-        seconds : 60
+        seconds : 1
         minutes : 60
-        hours   : 24
-        days    : [
-                    31, ( =>
-                      d = new Date @startdate.getFullYear() + (if @startdate.getMonth() >= 2 then 1 else 0), 2, 0
-                      d.getDate()
-                    )(), 31, 30,
-                    31, 30, 31, 31,
-                    30, 31, 30, 31
-                  ]
-        weeks   : 7
-        months  : 12
-        years   : 365
-
-
-
+        hours   : 60 * 60
+        days    : 24 * 60 * 60
+        weeks   : 7 * 24 * 60 * 60
+        months  : (value * 24 * 60 * 60 for value in [
+                                                        31, ( =>
+                                                          d = new Date @startdate.getFullYear() + (if @startdate.getMonth() >= 2 then 1 else 0), 2, 0
+                                                          d.getDate()
+                                                        )(), 31, 30,
+                                                        31, 30, 31, 31,
+                                                        30, 31, 30, 31
+                                                      ]
+                  )
+        years   : 365 * 24 * 60 * 60
 
       ###
-      # console.log cleanArray settings.values, units
-      
-      for unit of units
-        value = units[unit]
-        if !!value and $.inArray(unit, settings.values) isnt -1
-          console.log unit, value
-      ###
-
-
-
-      ###
-       * difference between two dates in seconds ###
+       * Set the difference between two dates in seconds.
+       *
+       * This value will be continually subtracted from.
+       * Using this method, we can take the difference in days
+       * from month to month as well as leap years. ###
 
       seconds  = Math.floor (@enddate - @startdate) / 1000
 
       ###
-       * Set the remaining seconds by checking how many
-       * seconds remain with the removal of minutes.
-       * Then find the remaining minutes by dividing by 60 seconds,
-       * and rounding down to a whole number. ###
+       * Create a blank ojbect that will hold all of our return values
+       *
+       * Loop through the values, checking that an equivilant value
+       * exists in the 'units' object and insert them into the
+       * 'this.remaining'. ###
 
-      @remaining.seconds = seconds % units.seconds
+      @remaining = {}
 
-      minutes = Math.floor seconds / units.seconds
-
-      ###
-       * Repeat for minutes. ###
-
-      @remaining.minutes = minutes % units.minutes
-
-      hours = Math.floor minutes / units.minutes
+      for unit of units 
+        value = units[unit]
+        if !!value and $.inArray(unit, settings.values) isnt -1
+          @remaining[unit] = true
 
       ###
-       * Repeat for hours. ###
+       * Loop through the years between now and then.
+       * Looping rather than just checking static years allows
+       * for leap years to be accounted for and not mess up the
+       * count of days between dates. ###
 
-      @remaining.hours = hours % units.hours
+
+      if @remaining.years
+        _years       = 0
+        _month       = @startdate.getMonth()
+        _current     = @startdate.getFullYear() + (if _month > 1 then + 1 else 0)
+        _yearLength  = units.years + (if new Date(_current, 2, 0).getDate() > 28 then units.days else 0)
+
+        ###
+         * Create an IIFE that will call itsself until it has less days
+         * remaining than days in the year it's checking for. ###
+
+        yearSetter = =>
+          if seconds >= _yearLength
+            seconds = seconds - _yearLength
+            _years = _years + 1
+            _current = _current + 1
+            _yearLength  = units.years + (if new Date(_current, 2, 0).getDate() > 28 then units.days else 0)
+            yearSetter()
+          else
+            @remaining.years = _years
+        yearSetter()
 
       ###
-       * Find total number of days.
-       * We will use this number to extract months and years. ###
+       * Loop through the months between now and then.
+       * Looping in this manner allows checking for different
+       * length months without removing or not removing the
+       * right amout of time from our count. ###
 
-      days = Math.floor hours / units.hours
+      if @remaining.months
+        _months      = 0
+        _current     = @startdate.getMonth()
+        _monthLength = units.months[_current]
+
+        ###
+         * Create an IIFE that will call itsself until it has less days
+         * remaining than days in the month it's checking for. ###
+
+        monthSetter = =>
+          if (seconds >= _monthLength)
+            seconds   = seconds - _monthLength
+            _months   = _months + 1
+            _current  = _current + 1
+            if _current is 12 then _current = 0
+            _monthLength = units.months[_current]
+            monthSetter()
+          else 
+            @remaining.months = _months
+        monthSetter()
+
 
       ###
-       * Remove the number of full years ###
+       * Since the last units of time (minutes, hours, days, weeks)
+       * don't change their length, we can loop through these
+       * rather than code another if block for each. ###
 
-      @remaining.years = Math.floor days / units.years
-
-      ###
-       * Reassign days with only the remainding after removing years. ###
-
-      days = days % units.years
-
-      ###
-       * Set the starting positions for the countdown. ###
-
-      months  = 0
-      current = @startdate.getMonth()
-      monthLength = units.days[current]
+      for unit in ["weeks", "days", "hours", "minutes"]
+        if @remaining[unit]
+          @remaining[unit] = Math.floor seconds / units[unit]
+          seconds = seconds % units[unit]
 
       ###
-       * Create an IIFE that will call itsself until it has less days
-       * remaining than days in the month it's checking for. ###
+       * Finally, set the seconds remaining. ###
 
-      monthSetter = =>
-        if (days >= monthLength)
-          days = days - monthLength
-          months  = months + 1
-          current = current + 1
-          monthLength = units.days[current]
-          monthSetter()
-        else 
-          @remaining.months = months
-          @remaining.days = days
-      monthSetter()
-
-      # @element.trigger "updateTime"
-
-      @timer = new Timer =>
-        @element.trigger "updateTime", @remaining
-
-      # @timer.start()
+      if @remaining.seconds then @remaining.seconds = seconds
 
   ###
    *
@@ -190,9 +210,11 @@ do (jQuery = $, window = window) ->
   ###
 
   $.fn[name].defaults =
-    enddate : new Date "11:59 PM Dec 31 2012 CST"
-    values  : ["years", "months", "weeks", "days", "seconds", "hours"]
+    enddate : new Date "12:59 AM Dec 31 2012 CST"
+    values  : ["days", "minutes", "seconds", "hours"]
 
-  $("#countdown")[name]().on "updateTime", (e, params) ->
-      console.log "updateTime", params
-      
+
+  $("#countdown").on("updateTime", (e, params) ->
+    for k,v of params
+      console.log k, v
+  )[name]()
