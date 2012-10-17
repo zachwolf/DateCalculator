@@ -212,9 +212,3 @@ do ($ = jQuery, window = window) ->
   $.fn[name].defaults =
     enddate : new Date "12:59 AM Dec 31 2012 CST"
     values  : ["days", "minutes", "seconds", "hours"]
-
-
-  $("#countdown").on("updateTime", (e, params) ->
-    for k,v of params
-      console.log k, v
-  )[name]()

@@ -261,19 +261,10 @@
        *
     */
 
-    $.fn[name].defaults = {
+    return $.fn[name].defaults = {
       enddate: new Date("12:59 AM Dec 31 2012 CST"),
       values: ["days", "minutes", "seconds", "hours"]
     };
-    return $("#countdown").on("updateTime", function(e, params) {
-      var k, v, _results;
-      _results = [];
-      for (k in params) {
-        v = params[k];
-        _results.push(console.log(k, v));
-      }
-      return _results;
-    })[name]();
   })(jQuery, window);
 
 }).call(this);
