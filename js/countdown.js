@@ -91,7 +91,7 @@
         var monthSetter, seconds, unit, units, value, yearSetter, _current, _i, _len, _month, _monthLength, _months, _ref, _yearLength, _years,
           _this = this;
         this.startdate = new Date();
-        this.enddate = settings.enddate;
+        this.enddate = new Date(settings.enddate);
         this.remaining = {};
         /*
                * To account for leap years, February is set as a function that
@@ -262,7 +262,7 @@
     */
 
     return $.fn[name].defaults = {
-      enddate: new Date("12:59 AM Dec 31 2012 CST"),
+      enddate: "12:59 AM Dec 31 2012 CST",
       values: ["days", "minutes", "seconds", "hours"]
     };
   })(jQuery, window);

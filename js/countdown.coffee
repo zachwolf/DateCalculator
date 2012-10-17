@@ -68,7 +68,7 @@ do ($ = jQuery, window = window) ->
 
     count       : (settings) ->
       @startdate  = new Date()
-      @enddate    = settings.enddate
+      @enddate    = new Date settings.enddate
       @remaining  = {}
 
       ###
@@ -210,5 +210,5 @@ do ($ = jQuery, window = window) ->
   ###
 
   $.fn[name].defaults =
-    enddate : new Date "12:59 AM Dec 31 2012 CST"
+    enddate : "12:59 AM Dec 31 2012 CST"
     values  : ["days", "minutes", "seconds", "hours"]
